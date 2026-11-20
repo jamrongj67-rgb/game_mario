@@ -1,0 +1,868 @@
+<!-- ... existing code ... -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HTML Quest: Wonder Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Fira+Code:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        body {
+            font-family: 'Fira Code', monospace;
+            background-color: #0c4a6e;
+            color: #f8fafc;
+            overflow: hidden;
+        }
+        .pixel-font {
+            font-family: 'Press Start 2P', cursive;
+        }
+        canvas {
+            image-rendering: pixelated;
+        }
+        .arcade-card {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            border: 4px solid #facc15;
+            box-shadow: 0 0 30px rgba(250, 204, 21, 0.5);
+        }
+        .btn-arcade {
+            transition: all 0.1s ease;
+            box-shadow: 0 5px 0 #0284c7;
+        }
+        .btn-arcade:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #0284c7;
+        }
+        .btn-yellow {
+            background: linear-gradient(180deg, #facc15 0%, #eab308 100%);
+            color: #0f172a;
+            box-shadow: 0 5px 0 #ca8a04;
+        }
+        .btn-yellow:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #ca8a04;
+        }
+        .btn-touch {
+            background: rgba(15, 23, 42, 0.8);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(4px);
+        }
+        .btn-touch:active {
+            background: rgba(56, 189, 248, 0.8);
+            border-color: #38bdf8;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-between items-center p-2 sm:p-3 select-none bg-sky-950">
+
+    <!-- HUD Header -->
+    <header class="w-full max-w-4xl bg-slate-900/90 border-4 border-amber-400 rounded-xl p-2 sm:p-3 flex justify-between items-center text-xs sm:text-sm shadow-2xl z-10 backdrop-blur-md">
+        <div class="flex items-center space-x-3 sm:space-x-4">
+            <div><span class="text-amber-300 font-bold">LVL:</span> <span id="hud-level" class="text-white font-bold pixel-font">1</span></div>
+            <div><span class="text-red-400 font-bold">LIVES:</span> <span id="hud-lives" class="text-red-500 font-bold">❤️❤️❤️</span></div>
+            <div><span class="text-yellow-400 font-bold">🪙</span> <span id="hud-coins" class="text-yellow-300 font-bold pixel-font">0</span></div>
+        </div>
+        <div class="hidden md:block text-cyan-300 font-bold text-center truncate max-w-xs" id="hud-topic">
+            Sejarah HTML
+        </div>
+        <div class="flex items-center gap-2">
+            <div><span class="text-emerald-400 font-bold">SCORE:</span> <span id="hud-score" class="text-emerald-300 font-bold pixel-font">0000</span></div>
+            <button onclick="openStudyModal()" class="ml-2 bg-purple-600 hover:bg-purple-500 text-white px-2.5 py-1 rounded-lg text-xs border border-purple-300 font-bold shadow">📖 Materi</button>
+        </div>
+    </header>
+
+    <!-- Canvas Container -->
+    <div class="relative w-full max-w-4xl flex-1 flex justify-center items-center overflow-hidden rounded-2xl border-4 border-amber-400 bg-sky-400 shadow-2xl my-2">
+        <canvas id="gameCanvas" class="w-full h-full object-contain"></canvas>
+
+        <!-- Overlay Menu (Start / Game Over / Win) -->
+        <div id="overlay-screen" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-4 text-center z-20">
+            <h1 id="overlay-title" class="text-2xl sm:text-4xl font-bold text-yellow-400 pixel-font mb-2 drop-shadow-lg animate-bounce">HTML QUEST: WONDER EDITION</h1>
+            <p id="overlay-subtitle" class="text-xs sm:text-sm text-slate-200 max-w-lg mb-6 leading-relaxed">
+                Jelajahi dunia platformer 2D ala Super Mario Wonder! Sundul blok <span class="text-yellow-400 font-bold">[?]</span> atau masuk ke <span class="text-emerald-400 font-bold">Pipa Hijau</span> untuk menjawab kuis.<br>
+                <span class="text-red-400 font-bold">Peringatan:</span> Jawaban salah atau terperosok jebakan akan mereset kamu ke Level 1!
+            </p>
+            <div class="flex flex-wrap gap-3 justify-center">
+                <button id="start-btn" onclick="startGame()" class="btn-yellow text-slate-900 font-bold px-6 py-3 rounded-xl text-xs sm:text-sm pixel-font">
+                    ▶ MULAI PETUALANGAN
+                </button>
+                <button onclick="openStudyModal()" class="btn-arcade bg-purple-600 text-white font-bold px-5 py-3 rounded-xl text-xs sm:text-sm">
+                    📖 BACA MODUL MATERI
+                </button>
+            </div>
+        </div>
+
+        <!-- Quiz Modal -->
+        <div id="quiz-modal" class="hidden absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-4 z-30">
+            <div class="arcade-card w-full max-w-xl p-4 sm:p-6 rounded-2xl text-left relative">
+                <div class="flex justify-between items-center mb-3 border-b-2 border-slate-700 pb-2">
+                    <span class="pixel-font text-xs text-yellow-400" id="quiz-level-tag">LEVEL 1 - CHECKPOINT</span>
+                    <span class="text-xs bg-red-600 text-white px-2 py-0.5 rounded font-bold animate-pulse">⚠️ JEBAKAN RESET!</span>
+                </div>
+                <h3 id="quiz-question" class="text-sm sm:text-base font-bold text-slate-100 mb-5 leading-relaxed">
+                    Pertanyaan Kuis...
+                </h3>
+                <div id="quiz-options" class="grid grid-cols-1 gap-2.5">
+                    <!-- Dynamic Answer Buttons -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Study Material Modal -->
+        <div id="study-modal" class="hidden absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-4 z-40">
+            <div class="arcade-card w-full max-w-2xl max-h-[85%] p-4 sm:p-6 rounded-2xl text-left flex flex-col border-cyan-400">
+                <div class="flex justify-between items-center border-b border-slate-700 pb-2 mb-3">
+                    <h2 class="text-base sm:text-lg font-bold text-cyan-400 pixel-font">📚 MODUL MATERI HTML</h2>
+                    <button onclick="closeStudyModal()" class="text-red-400 font-bold text-xl px-2">✕</button>
+                </div>
+                <div class="overflow-y-auto space-y-4 text-xs sm:text-sm text-slate-200 pr-2">
+                    <div class="p-3 bg-slate-800/80 rounded-lg border border-slate-700">
+                        <h3 class="text-yellow-400 font-bold mb-1">Level 1: Sejarah HTML (Easy)</h3>
+                        <p>HTML (HyperText Markup Language) diciptakan oleh <b>Tim Berners-Lee</b> di CERN pada tahun 1991. Dikelola oleh konsorsium <b>W3C</b> & <b>WHATWG</b> hingga era HTML5 modern.</p>
+                    </div>
+                    <div class="p-3 bg-slate-800/80 rounded-lg border border-slate-700">
+                        <h3 class="text-yellow-400 font-bold mb-1">Level 2: Cara Kerja HTML (Medium)</h3>
+                        <p>Web Browser (Client) mengirim HTTP request ke Web Server. Server membalas dengan dokumen HTML yang kemudian di-parse oleh browser menjadi hirarki <b>DOM (Document Object Model)</b> untuk dirender visual.</p>
+                    </div>
+                    <div class="p-3 bg-slate-800/80 rounded-lg border border-slate-700">
+                        <h3 class="text-yellow-400 font-bold mb-1">Level 3: Atribut HTML (Hard)</h3>
+                        <p>Atribut memberikan instruksi tambahan pada tag. Contoh: <code>href</code> untuk tautan `<a>`, <code>src</code> & <code>alt</code> untuk gambar `<img>`, <code>target="_blank"</code> untuk tab baru, serta atribut global seperti <code>class</code>, <code>id</code>, dan <code>style</code>.</p>
+                    </div>
+                    <div class="p-3 bg-slate-800/80 rounded-lg border border-slate-700">
+                        <h3 class="text-yellow-400 font-bold mb-1">Level 4: Tag & Struktur HTML (Expert)</h3>
+                        <p>Struktur utama: <code>&lt;!DOCTYPE html&gt;</code>, <code>&lt;html&gt;</code>, <code>&lt;head&gt;</code>, dan <code>&lt;body&gt;</code>. Tag Semantik modern meliputi <code>&lt;header&gt;</code>, <code>&lt;nav&gt;</code>, <code>&lt;main&gt;</code>, <code>&lt;article&gt;</code>, serta <code>&lt;ol&gt;</code> (ordered list) dan <code>&lt;ul&gt;</code> (unordered list).</p>
+                    </div>
+                </div>
+                <button onclick="closeStudyModal()" class="mt-4 bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 rounded-lg text-xs pixel-font">TUTUP MODUL</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- On-Screen Touch Controls (Mobile / Android) -->
+    <footer class="w-full max-w-4xl flex justify-between items-center gap-2 touch-none z-10">
+        <div class="flex gap-2">
+            <button id="btn-left" class="btn-touch text-white text-2xl font-bold w-14 h-14 rounded-2xl flex items-center justify-center">◀</button>
+            <button id="btn-right" class="btn-touch text-white text-2xl font-bold w-14 h-14 rounded-2xl flex items-center justify-center">▶</button>
+        </div>
+        <div class="text-[10px] sm:text-xs text-sky-200 text-center hidden sm:block">
+            Navigasi: <kbd class="px-1.5 py-0.5 bg-slate-800 rounded text-amber-300">A / D / Panah</kbd> | Lompat: <kbd class="px-1.5 py-0.5 bg-slate-800 rounded text-amber-300">W / Space</kbd> | Masuk Pipa: <kbd class="px-1.5 py-0.5 bg-slate-800 rounded text-amber-300">S / Panah Bawah</kbd>
+        </div>
+        <div class="flex gap-2">
+            <button id="btn-down" class="btn-touch text-amber-300 text-xl font-bold w-14 h-14 rounded-2xl flex items-center justify-center">▼</button>
+            <button id="btn-jump" class="btn-touch bg-amber-500/80 border-amber-300 text-white text-xs font-bold w-16 h-14 rounded-2xl flex items-center justify-center pixel-font">JUMP</button>
+        </div>
+    </footer>
+
+    <!-- Audio Effects Generator (Synthesizer Web Audio API) -->
+    <script>
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new AudioCtx();
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                const now = audioCtx.currentTime;
+
+                if (type === 'jump') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(170, now);
+                    osc.frequency.exponentialRampToValueAtTime(480, now + 0.12);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
+                    osc.start(now); osc.stop(now + 0.12);
+                } else if (type === 'coin') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(987.77, now);
+                    osc.frequency.setValueAtTime(1318.51, now + 0.08);
+                    gain.gain.setValueAtTime(0.25, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.22);
+                    osc.start(now); osc.stop(now + 0.22);
+                } else if (type === 'hit') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(280, now);
+                    osc.frequency.setValueAtTime(130, now + 0.1);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+                    osc.start(now); osc.stop(now + 0.2);
+                } else if (type === 'wrong') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(240, now);
+                    osc.frequency.linearRampToValueAtTime(70, now + 0.45);
+                    gain.gain.setValueAtTime(0.4, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.45);
+                    osc.start(now); osc.stop(now + 0.45);
+                } else if (type === 'win') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(523.25, now);
+                    osc.frequency.setValueAtTime(659.25, now + 0.1);
+                    osc.frequency.setValueAtTime(783.99, now + 0.2);
+                    osc.frequency.setValueAtTime(1046.50, now + 0.3);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.5);
+                    osc.start(now); osc.stop(now + 0.5);
+                }
+            } catch (e) {
+                console.log(e);
+            }
+        }
+    </script>
+
+    <!-- Core Game Engine -->
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = 800;
+        canvas.height = 450;
+
+        let gameState = 'START'; // START, PLAYING, QUIZ, GAMEOVER, WIN
+        let currentLevelIndex = 0;
+        let score = 0;
+        let coins = 0;
+        let lives = 3;
+        let animFrame = 0;
+
+        const keys = { right: false, left: false, up: false, down: false };
+
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            );
+        }
+
+        // Updated 4 Level Curriculum
+        const levelQuestions = [
+            {
+                level: 1,
+                title: "1. Sejarah HTML (Easy)",
+                question: "Siapa ilmuwan penemu HTML pertama kali di laboratorium CERN pada 1991, dan organisasi mana yang memelihara standarnya?",
+                options: [
+                    { text: "Tim Berners-Lee & dikelola oleh W3C / WHATWG", correct: true },
+                    { text: "Alan Turing & dikelola oleh Google Chrome Team", correct: false },
+                    { text: "Brendan Eich & dikelola oleh Mozilla Foundation", correct: false },
+                    { text: "Bill Gates & dikelola oleh Microsoft", correct: false }
+                ]
+            },
+            {
+                level: 2,
+                title: "2. Cara Kerja HTML (Medium)",
+                question: "Bagaimana alur kerja web browser saat memproses file HTML yang dikirimkan oleh web server?",
+                options: [
+                    { text: "Browser mengonversi tag HTML menjadi file video mp4", correct: false },
+                    { text: "Browser menerima response HTTP, me-parse dokumen menjadi DOM Tree, lalu merender halaman visual", correct: true },
+                    { text: "Browser langsung mengeksekusi HTML sebagai skrip biner mesin", correct: false },
+                    { text: "Browser menyimpan data HTML ke memori sistem tanpa merender", correct: false }
+                ]
+            },
+            {
+                level: 3,
+                title: "3. Atribut HTML (Hard)",
+                question: "Manakah sintaks yang BENAR untuk menampilkan gambar dengan teks alternatif dan membuka tautan di tab baru?",
+                options: [
+                    { text: "<img url='logo.png'> & <a tab='new'>", correct: false },
+                    { text: "<img src='logo.png' alt='Logo'> & <a href='...' target='_blank'>", correct: true },
+                    { text: "<picture file='logo.png'> & <link open='blank'>", correct: false },
+                    { text: "<image src='logo.png' text='Logo'> & <a newtab='true'>", correct: false }
+                ]
+            },
+            {
+                level: 4,
+                title: "4. Tag & Struktur HTML (Expert)",
+                question: "Manakah pasangan tag semantik navigasi dan tag untuk membuat daftar berurutan (1, 2, 3)?",
+                options: [
+                    { text: "<nav> untuk navigasi & <ol> untuk daftar berurutan", correct: true },
+                    { text: "<menu> untuk navigasi & <ul> untuk daftar berurutan", correct: false },
+                    { text: "<header> untuk navigasi & <list> untuk daftar berurutan", correct: false },
+                    { text: "<section> untuk navigasi & <dl> untuk daftar berurutan", correct: false }
+                ]
+            }
+        ];
+
+        // Developer Hero Avatar
+        const player = {
+            x: 50,
+            y: 300,
+            width: 34,
+            height: 44,
+            vx: 0,
+            vy: 0,
+            speed: 5.2,
+            jumpForce: -12.4,
+            gravity: 0.62,
+            grounded: false,
+            facing: 'right',
+            animTimer: 0,
+            resetPosition: function() {
+                this.x = 50;
+                this.y = 300;
+                this.vx = 0;
+                this.vy = 0;
+            }
+        };
+
+        // Level World Generator
+        function getLevelData(levelNum) {
+            const worldWidth = 1800 + (levelNum * 450);
+
+            let platforms = [
+                { x: 0, y: 390, w: 550, h: 60, type: 'ground' },
+                { x: 680, y: 390, w: 500, h: 60, type: 'ground' },
+                { x: 1300, y: 390, w: worldWidth - 1300, h: 60, type: 'ground' },
+                { x: 220, y: 280, w: 110, h: 24, type: 'brick' },
+                { x: 420, y: 220, w: 120, h: 24, type: 'brick' },
+                { x: 760, y: 290, w: 130, h: 24, type: 'brick' },
+                { x: 970, y: 210, w: 110, h: 24, type: 'brick' },
+                { x: 1380, y: 280, w: 140, h: 24, type: 'brick' }
+            ];
+
+            let questionBlocks = [
+                { x: 340, y: 220, w: 32, h: 32, hit: false },
+                { x: 910, y: 210, w: 32, h: 32, hit: false }
+            ];
+
+            let coinsList = [
+                { x: 235, y: 245, collected: false },
+                { x: 275, y: 245, collected: false },
+                { x: 440, y: 185, collected: false },
+                { x: 480, y: 185, collected: false },
+                { x: 780, y: 255, collected: false },
+                { x: 820, y: 255, collected: false },
+                { x: 1410, y: 245, collected: false }
+            ];
+
+            let enemies = [
+                { x: 400, y: 360, w: 30, h: 30, vx: 2, minX: 350, maxX: 530 },
+                { x: 800, y: 260, w: 30, h: 30, vx: -2.2, minX: 760, maxX: 870 },
+                { x: 1420, y: 360, w: 30, h: 30, vx: 2.8, minX: 1310, maxX: 1650 }
+            ];
+
+            let spikes = [
+                { x: 550, y: 430, w: 130, h: 20 },
+                { x: 1180, y: 430, w: 120, h: 20 }
+            ];
+
+            let trees = [
+                { x: 120, y: 290 }, { x: 750, y: 290 }, { x: 1500, y: 290 }
+            ];
+
+            let greenPipe = {
+                x: worldWidth - 140,
+                y: 310,
+                w: 60,
+                h: 80
+            };
+
+            if (levelNum >= 2) {
+                enemies.push({ x: 990, y: 180, w: 30, h: 30, vx: -3, minX: 970, maxX: 1060 });
+            }
+            if (levelNum >= 3) {
+                enemies.push({ x: 1600, y: 180, w: 30, h: 30, vx: 3.5, minX: 1550, maxX: 1680 });
+                coinsList.push({ x: 1000, y: 175, collected: false });
+            }
+            if (levelNum >= 4) {
+                enemies.push({ x: 260, y: 245, w: 30, h: 30, vx: -3.8, minX: 220, maxX: 310 });
+                spikes.push({ x: 380, y: 370, w: 80, h: 20 });
+            }
+
+            return { worldWidth, platforms, questionBlocks, coinsList, enemies, spikes, trees, greenPipe };
+        }
+
+        let currentLevel = getLevelData(1);
+        let cameraX = 0;
+
+        // Render Background Layers
+        function drawBackground() {
+            let grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            grad.addColorStop(0, '#0284c7');
+            grad.addColorStop(0.6, '#38bdf8');
+            grad.addColorStop(1, '#bae6fd');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Parallax Clouds
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+            const cloudOffset = (cameraX * 0.2) % 400;
+            for (let i = -50; i < canvas.width + 100; i += 200) {
+                let cx = i - cloudOffset;
+                ctx.beginPath();
+                ctx.arc(cx, 80, 25, 0, Math.PI * 2);
+                ctx.arc(cx + 25, 70, 35, 0, Math.PI * 2);
+                ctx.arc(cx + 55, 80, 25, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Distant Hills
+            ctx.fillStyle = '#34d399';
+            const hillOffset = (cameraX * 0.4) % 600;
+            for (let i = -100; i < canvas.width + 200; i += 300) {
+                let hx = i - hillOffset;
+                ctx.beginPath();
+                ctx.arc(hx + 100, 430, 145, Math.PI, 0);
+                ctx.fill();
+            }
+
+            // Fantasy Trees
+            currentLevel.trees.forEach(t => {
+                const tx = t.x - cameraX;
+                if (tx < -60 || tx > canvas.width + 60) return;
+
+                ctx.fillStyle = '#78350f';
+                ctx.fillRect(tx + 18, t.y + 40, 14, 60);
+                ctx.fillStyle = '#059669';
+                ctx.beginPath();
+                ctx.arc(tx + 25, t.y + 35, 32, 0, Math.PI * 2);
+                ctx.arc(tx + 8, t.y + 20, 24, 0, Math.PI * 2);
+                ctx.arc(tx + 42, t.y + 20, 24, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        function drawPlayer() {
+            const px = player.x - cameraX;
+            const py = player.y;
+
+            ctx.save();
+            ctx.translate(px + player.width / 2, py + player.height / 2);
+            if (player.facing === 'left') ctx.scale(-1, 1);
+
+            // Legs running animation offset
+            let legOffset = player.vx !== 0 ? Math.sin(animFrame * 0.3) * 4 : 0;
+
+            // Hoodie Body
+            ctx.fillStyle = '#0284c7';
+            ctx.fillRect(-11, -6, 22, 24);
+
+            // HTML5 Emblem
+            ctx.fillStyle = '#ea580c';
+            ctx.fillRect(-4, -2, 8, 8);
+
+            // Pants & Shoes
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(-9, 18, 8, 8);
+            ctx.fillRect(1, 18, 8, 8);
+            ctx.fillStyle = '#f8fafc';
+            ctx.fillRect(-10 + legOffset, 24, 9, 4);
+            ctx.fillRect(1 - legOffset, 24, 9, 4);
+
+            // Head & Cap
+            ctx.fillStyle = '#fde047';
+            ctx.fillRect(-9, -22, 18, 16);
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(-11, -26, 22, 6);
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(2, -18, 7, 4);
+            ctx.fillRect(-7, -18, 7, 4);
+
+            ctx.restore();
+        }
+
+        function drawPlatform(plat) {
+            const px = plat.x - cameraX;
+            if (px + plat.w < 0 || px > canvas.width) return;
+
+            if (plat.type === 'ground') {
+                ctx.fillStyle = '#854d0e';
+                ctx.fillRect(px, plat.y, plat.w, plat.h);
+
+                ctx.fillStyle = '#22c55e';
+                ctx.fillRect(px, plat.y, plat.w, 14);
+
+                ctx.fillStyle = '#15803d';
+                for (let x = px; x < px + plat.w; x += 12) {
+                    ctx.fillRect(x, plat.y + 14, 6, 4);
+                }
+            } else {
+                ctx.fillStyle = '#b45309';
+                ctx.fillRect(px, plat.y, plat.w, plat.h);
+                ctx.strokeStyle = '#78350f';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(px, plat.y, plat.w, plat.h);
+            }
+        }
+
+        function drawQuestionBlock(qb) {
+            const qx = qb.x - cameraX;
+            if (qx + qb.w < 0 || qx > canvas.width) return;
+
+            ctx.fillStyle = qb.hit ? '#94a3b8' : '#f59e0b';
+            ctx.fillRect(qx, qb.y, qb.w, qb.h);
+            ctx.strokeStyle = '#b45309';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(qx, qb.y, qb.w, qb.h);
+
+            if (!qb.hit) {
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 16px "Press Start 2P", cursive';
+                ctx.textAlign = 'center';
+                ctx.fillText('?', qx + qb.w / 2, qb.y + 23);
+            }
+        }
+
+        function drawCoin(c) {
+            if (c.collected) return;
+            const cx = c.x - cameraX;
+            if (cx < -20 || cx > canvas.width + 20) return;
+
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath();
+            ctx.arc(cx, c.y, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#ca8a04';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        function drawEnemy(e) {
+            const ex = e.x - cameraX;
+            if (ex < -40 || ex > canvas.width + 40) return;
+
+            ctx.fillStyle = '#dc2626';
+            ctx.beginPath();
+            ctx.arc(ex + 15, e.y + 15, 14, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eyes
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(ex + 6, e.y + 8, 6, 6);
+            ctx.fillRect(ex + 18, e.y + 8, 6, 6);
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(ex + 8, e.y + 10, 3, 3);
+            ctx.fillRect(ex + 20, e.y + 10, 3, 3);
+        }
+
+        function drawSpike(s) {
+            const sx = s.x - cameraX;
+            if (sx + s.w < 0 || sx > canvas.width) return;
+
+            ctx.fillStyle = '#ef4444';
+            const count = Math.floor(s.w / 12);
+            for (let i = 0; i < count; i++) {
+                ctx.beginPath();
+                ctx.moveTo(sx + (i * 12), s.y + s.h);
+                ctx.lineTo(sx + (i * 12) + 6, s.y);
+                ctx.lineTo(sx + (i * 12) + 12, s.y + s.h);
+                ctx.fill();
+            }
+        }
+
+        function drawGreenPipe(pipe) {
+            const px = pipe.x - cameraX;
+            if (px + pipe.w < 0 || px > canvas.width) return;
+
+            ctx.fillStyle = '#16a34a';
+            ctx.fillRect(px - 4, pipe.y, pipe.w + 8, 20);
+            ctx.strokeStyle = '#14532d';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(px - 4, pipe.y, pipe.w + 8, 20);
+
+            ctx.fillStyle = '#22c55e';
+            ctx.fillRect(px, pipe.y + 20, pipe.w, pipe.h - 20);
+            ctx.strokeRect(px, pipe.y + 20, pipe.w, pipe.h - 20);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 10px "Fira Code", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('</NEXT>', px + pipe.w / 2, pipe.y + 50);
+        }
+
+        function render() {
+            animFrame++;
+            drawBackground();
+            currentLevel.platforms.forEach(drawPlatform);
+            currentLevel.spikes.forEach(drawSpike);
+            currentLevel.questionBlocks.forEach(drawQuestionBlock);
+            currentLevel.coinsList.forEach(drawCoin);
+            drawGreenPipe(currentLevel.greenPipe);
+            currentLevel.enemies.forEach(drawEnemy);
+            drawPlayer();
+        }
+
+        // ... existing code ...
+<!-- ... existing code -->
+        function update() {
+            if (gameState !== 'PLAYING') return;
+
+            if (keys.right) {
+                player.vx = player.speed;
+                player.facing = 'right';
+            } else if (keys.left) {
+                player.vx = -player.speed;
+                player.facing = 'left';
+            } else {
+                player.vx = 0;
+            }
+
+            if (keys.up && player.grounded) {
+                player.vy = player.jumpForce;
+                player.grounded = false;
+                playSound('jump');
+            }
+
+            player.vy += player.gravity;
+            player.x += player.vx;
+            player.y += player.vy;
+
+            if (player.x < 0) player.x = 0;
+
+            player.grounded = false;
+            currentLevel.platforms.forEach(plat => {
+                if (player.x < plat.x + plat.w &&
+                    player.x + player.width > plat.x &&
+                    player.y < plat.y + plat.h &&
+                    player.y + player.height > plat.y) {
+
+                    if (player.vy > 0 && player.y + player.height - player.vy <= plat.y + 12) {
+                        player.y = plat.y - player.height;
+                        player.vy = 0;
+                        player.grounded = true;
+                    }
+                }
+            });
+
+            currentLevel.questionBlocks.forEach(qb => {
+                if (player.x < qb.x + qb.w &&
+                    player.x + player.width > qb.x &&
+                    player.y < qb.y + qb.h &&
+                    player.y + player.height > qb.y) {
+
+                    if (player.vy < 0 && player.y <= qb.y + qb.h && !qb.hit) {
+                        qb.hit = true;
+                        player.vy = 2;
+                        playSound('coin');
+                        triggerQuiz();
+                    } else if (player.vy > 0 && player.y + player.height - player.vy <= qb.y + 10) {
+                        player.y = qb.y - player.height;
+                        player.vy = 0;
+                        player.grounded = true;
+                    }
+                }
+            });
+
+            currentLevel.coinsList.forEach(c => {
+                if (!c.collected) {
+                    let dx = (player.x + player.width / 2) - c.x;
+                    let dy = (player.y + player.height / 2) - c.y;
+                    if (Math.sqrt(dx * dx + dy * dy) < 22) {
+                        c.collected = true;
+                        coins++;
+                        score += 50;
+                        playSound('coin');
+                        updateHUD();
+                    }
+                }
+            });
+
+            const pipe = currentLevel.greenPipe;
+            if (player.x + player.width > pipe.x && player.x < pipe.x + pipe.w &&
+                player.y + player.height >= pipe.y && player.y < pipe.y + pipe.h) {
+                if (keys.down) {
+                    triggerQuiz();
+                }
+            }
+
+            currentLevel.enemies.forEach(e => {
+                e.x += e.vx;
+                if (e.x <= e.minX || e.x + e.w >= e.maxX) e.vx *= -1;
+
+                if (player.x < e.x + e.w &&
+                    player.x + player.width > e.x &&
+                    player.y < e.y + e.h &&
+                    player.y + player.height > e.y) {
+
+                    if (player.vy > 0 && player.y + player.height - player.vy <= e.y + 10) {
+                        e.x = -9999;
+                        player.vy = -8;
+                        score += 100;
+                        playSound('coin');
+                        updateHUD();
+                    } else {
+                        takeDamage();
+                    }
+                }
+            });
+
+            currentLevel.spikes.forEach(s => {
+                if (player.x < s.x + s.w &&
+                    player.x + player.width > s.x &&
+                    player.y < s.y + s.h &&
+                    player.y + player.height > s.y) {
+                    resetToLevel1("Kena Jebakan Duri Error!");
+                }
+            });
+
+            if (player.y > canvas.height + 40) {
+                resetToLevel1("Jatuh ke Jurang!");
+            }
+
+            cameraX = player.x - 200;
+            if (cameraX < 0) cameraX = 0;
+            if (cameraX > currentLevel.worldWidth - canvas.width) {
+                cameraX = currentLevel.worldWidth - canvas.width;
+            }
+        }
+
+        function takeDamage() {
+            playSound('hit');
+            lives--;
+            updateHUD();
+
+            if (lives <= 0) {
+                resetToLevel1("Nyawa Habis Diserang Bug!");
+            } else {
+                player.resetPosition();
+            }
+        }
+
+        function resetToLevel1(reasonMessage) {
+            playSound('wrong');
+            alert(`⚠️ ${reasonMessage.toUpperCase()}\n\nJebakan Aktif! Kamu terlempar kembali ke LEVEL 1!`);
+            currentLevelIndex = 0;
+            score = 0;
+            lives = 3;
+            loadLevel(0);
+        }
+
+        function triggerQuiz() {
+            gameState = 'QUIZ';
+            const qData = levelQuestions[currentLevelIndex];
+
+            document.getElementById('quiz-level-tag').innerText = `LEVEL ${qData.level} - KUIS MATERI`;
+            document.getElementById('quiz-question').innerText = qData.question;
+
+            const optsContainer = document.getElementById('quiz-options');
+            optsContainer.innerHTML = '';
+
+            qData.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = "btn-arcade bg-slate-800 hover:bg-slate-700 text-slate-100 p-3 rounded-xl text-left text-xs sm:text-sm border border-slate-600 flex items-center space-x-2";
+                btn.innerHTML = `<span class="text-amber-400 font-bold">${String.fromCharCode(65 + idx)}.</span> <span>${escapeHTML(opt.text)}</span>`;
+                btn.onclick = () => answerQuiz(opt.correct);
+                optsContainer.appendChild(btn);
+            });
+
+            document.getElementById('quiz-modal').classList.remove('hidden');
+        }
+
+        function answerQuiz(isCorrect) {
+            document.getElementById('quiz-modal').classList.add('hidden');
+
+            if (isCorrect) {
+                playSound('win');
+                score += 300;
+                updateHUD();
+
+                currentLevelIndex++;
+                if (currentLevelIndex >= levelQuestions.length) {
+                    gameWin();
+                } else {
+                    loadLevel(currentLevelIndex);
+                }
+            } else {
+                resetToLevel1("Jawaban Kuis Salah!");
+            }
+        }
+
+        function loadLevel(index) {
+            currentLevelIndex = index;
+            currentLevel = getLevelData(index + 1);
+            player.resetPosition();
+            updateHUD();
+            gameState = 'PLAYING';
+        }
+
+        function updateHUD() {
+            document.getElementById('hud-level').innerText = currentLevelIndex + 1;
+            document.getElementById('hud-score').innerText = score.toString().padStart(4, '0');
+            document.getElementById('hud-coins').innerText = coins;
+            document.getElementById('hud-lives').innerText = '❤️'.repeat(Math.max(0, lives));
+            document.getElementById('hud-topic').innerText = levelQuestions[currentLevelIndex].title;
+        }
+
+        function startGame() {
+            initAudio();
+            document.getElementById('overlay-screen').classList.add('hidden');
+            score = 0;
+            coins = 0;
+            lives = 3;
+            loadLevel(0);
+        }
+
+        function gameWin() {
+            gameState = 'WIN';
+            playSound('win');
+            document.getElementById('overlay-title').innerText = '🏆 VICTORY MASTER HTML!';
+            document.getElementById('overlay-subtitle').innerHTML = `Selamat! Kamu berhasil menyelesaikan semua 4 Level dan menguasai seluruh materi HTML!<br><span class="text-emerald-400 font-bold">Total Skor: ${score} | Koin: ${coins}</span>`;
+            document.getElementById('start-btn').innerText = '🔄 MAIN LAGI';
+            document.getElementById('overlay-screen').classList.remove('hidden');
+        }
+
+        function openStudyModal() {
+            document.getElementById('study-modal').classList.remove('hidden');
+        }
+
+        function closeStudyModal() {
+            document.getElementById('study-modal').classList.add('hidden');
+        }
+
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.addEventListener('keydown', e => {
+            initAudio();
+            if (['ArrowRight', 'KeyD'].includes(e.code)) keys.right = true;
+            if (['ArrowLeft', 'KeyA'].includes(e.code)) keys.left = true;
+            if (['ArrowUp', 'KeyW', 'Space'].includes(e.code)) keys.up = true;
+            if (['ArrowDown', 'KeyS'].includes(e.code)) keys.down = true;
+        });
+
+        window.addEventListener('keyup', e => {
+            if (['ArrowRight', 'KeyD'].includes(e.code)) keys.right = false;
+            if (['ArrowLeft', 'KeyA'].includes(e.code)) keys.left = false;
+            if (['ArrowUp', 'KeyW', 'Space'].includes(e.code)) keys.up = false;
+            if (['ArrowDown', 'KeyS'].includes(e.code)) keys.down = false;
+        });
+
+        function setupTouchButton(id, keyName) {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            const startHandler = (e) => {
+                e.preventDefault();
+                initAudio();
+                keys[keyName] = true;
+            };
+            const endHandler = (e) => {
+                e.preventDefault();
+                keys[keyName] = false;
+            };
+            btn.addEventListener('touchstart', startHandler);
+            btn.addEventListener('touchend', endHandler);
+            btn.addEventListener('mousedown', startHandler);
+            btn.addEventListener('mouseup', endHandler);
+            btn.addEventListener('mouseleave', endHandler);
+        }
+
+        setupTouchButton('btn-left', 'left');
+        setupTouchButton('btn-right', 'right');
+        setupTouchButton('btn-jump', 'up');
+        setupTouchButton('btn-down', 'down');
+
+        window.onload = function() {
+            gameLoop();
+        };
+    </script>
+</body>
+</html>
